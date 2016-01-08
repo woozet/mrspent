@@ -9,7 +9,7 @@ router.get('/',
 router.get('/callback', 
   passport.authenticate('google', { failureRedirect: '/login' }),
   function(req, res, next) {
-  	res.cookie('SID', req.user.id, { expires: new Date(Date.now() + 900000) });
+  	res.cookie('SID', req.user.id, { expires: new Date(Date.now() + (86400 * 30 * 1000)) });
     res.redirect('/');
   });
 
