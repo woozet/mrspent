@@ -3,6 +3,12 @@ var request = require('request');
 var config = require('../config');
 var extend = require('util')._extend;
 var router = express.Router();
+var simpleCache = {
+	total: 0,
+	recentList: [],
+	updatedTime: null
+};
+var cacheExpireTime = 3600;
 
 var requestTemplate = {
 	uri: ['https://script.googleapis.com/v1/scripts/', config.appScriptInfo.projectId, ':run'].join(''),
@@ -16,6 +22,11 @@ var requestTemplate = {
 };
 
 router.get('/', ensureAuthenticated, function(req, res, next){
+	if (simpleCache.updatedTime && (new Date().getTime() - simpleCache.updatedTime) / 1000 < cacheExpireTime) {
+		res.json(simpleCache.recentList);
+		return;
+	}
+
 	var options = extend({}, requestTemplate)
 		, offset = req.query.offset || 10;;
 
@@ -46,6 +57,11 @@ router.post('/', ensureAuthenticated, function(req, res, next) {
 }, commonRequest);
 
 router.get('/total', ensureAuthenticated, function(req, res, next) {
+	if (simpleCache.updatedTime && (new Date().getTime() - simpleCache.updatedTime) / 1000 < cacheExpireTime) {
+		res.json(simpleCache.total);
+		return;
+	}
+
 	var options = extend({}, requestTemplate);
 
 	options.auth.bearer = req.user.token;
@@ -77,6 +93,23 @@ function commonRequest(req, res, next) {
 		}
 
 		parsed = JSON.parse(body);
+
+		// Simple caching
+		switch (JSON.parse(req.options.body).function) {
+			case 'getTotalSpending':
+				simpleCache.total = parsed.response.result;
+				simpleCache.updatedTime = new Date().getTime();
+				break;
+			case 'getRecentDataOrderByDesc':
+				simpleCache.recentList = parsed.response.result;
+				simpleCache.updatedTime = new Date().getTime();
+				break;
+			case 'addUsage':
+				simpleCache.updatedTime = null;
+				break;
+			default:
+				break;
+		}
 
 		res.json(parsed.response.result);
 	});
