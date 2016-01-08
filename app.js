@@ -4,10 +4,10 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-var session = require('express-session');
 var passport = require('passport');
 var methodOverride = require('method-override');
 var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
+var refresh = require('passport-oauth2-refresh');
 var config = require('./config');
 
 var routes = require('./routes/index');
@@ -15,6 +15,8 @@ var googleAuth = require('./routes/googleauth');
 var spending = require('./routes/spending');
 
 var app = express();
+
+var authCache = {};
 
 // API Access link for creating client ID and secret:
 // https://code.google.com/apis/console/
@@ -24,6 +26,7 @@ var GOOGLE_CLIENT_SECRET = config.googleOauthJson.web.client_secret;
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
+app.set('users', authCache);
 
 app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev'));
@@ -31,27 +34,33 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(methodOverride());
-app.use(session({
-  secret: 'keyboard cat',
-  saveUninitialized: false,
-  resave: true
-}));
 app.use(passport.initialize());
-app.use(passport.session());
 app.use(express.static(path.join(__dirname, 'public')));
 
-passport.use(new GoogleStrategy({
+var strategy = new GoogleStrategy({
     clientID: GOOGLE_CLIENT_ID,
     clientSecret: GOOGLE_CLIENT_SECRET,
     callbackURL: config.googleOauthJson.web.redirect_uris[0]  // Choose index of redirect uris in config
   },
   function(accessToken, refreshToken, profile, done) {
     process.nextTick(function () {
-      profile.token = accessToken;
+      authCache[profile.id] = {
+        profile: profile,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        issued: new Date().getTime()
+      };
+
+      console.log('Log user info :', profile);
+      console.log('Log user token :', accessToken);
+      console.log('Log user refresh :', refreshToken);
       return done(null, profile);
     });
   }
-));
+);
+
+passport.use(strategy);
+refresh.use(strategy);
 
 passport.serializeUser(function(user, done) {
   done(null, user);

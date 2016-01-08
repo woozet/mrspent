@@ -3,6 +3,8 @@ var request = require('request');
 var config = require('../config');
 var extend = require('util')._extend;
 var router = express.Router();
+var refresh = require('passport-oauth2-refresh');
+
 var simpleCache = {
 	total: 0,
 	recentList: [],
@@ -21,66 +23,70 @@ var requestTemplate = {
 	}
 };
 
-router.get('/', ensureAuthenticated, function(req, res, next){
-	if (simpleCache.updatedTime && (new Date().getTime() - simpleCache.updatedTime) / 1000 < cacheExpireTime) {
-		res.json(simpleCache.recentList);
-		return;
-	}
+var requestPreflight = function(req, res, next) {
+	var userInfo = req.app.get('users')[req.cookies.SID];
 
-	var options = extend({}, requestTemplate)
-		, offset = req.query.offset || 10;;
-
-	options.auth.bearer = req.user.token;
-	options.body = JSON.stringify({
-	    devMode: true,
-	    function: 'getRecentDataOrderByDesc',
-	    parameters: [offset]
-	});
-
-	req.options = options;
-	next();
-}, commonRequest);
-
-router.post('/', ensureAuthenticated, function(req, res, next) {
-	var options = extend({}, requestTemplate)
-		, body = req.body
-
-	options.auth.bearer = req.user.token;
-	options.body = JSON.stringify({
-	    devMode: true,
-	    function: 'addUsage',
-	    parameters: [body.note, body.amount, body.dayBackwards, body.paymentType]
-	});
-
-	req.options = options;
-	next();
-}, commonRequest);
-
-router.get('/total', ensureAuthenticated, function(req, res, next) {
-	if (simpleCache.updatedTime && (new Date().getTime() - simpleCache.updatedTime) / 1000 < cacheExpireTime) {
-		res.json(simpleCache.total);
-		return;
+	if (!userInfo) {
+		next({
+	  		status: 401,
+	  		message: "Unauthorized"
+	  	});
 	}
 
 	var options = extend({}, requestTemplate);
 
-	options.auth.bearer = req.user.token;
+	options.auth.bearer = userInfo.accessToken;
 	options.body = JSON.stringify({
 	    devMode: true,
 	    function: 'getTotalSpending'
 	});
 
-	req.options = options;
+	if ((new Date().getTime() - userInfo.issued) / 1000 >= cacheExpireTime) {
+		refresh.requestNewAccessToken('google', userInfo.refreshToken, function(err, accessToken, refreshToken) {
+			userInfo.accessToken = accessToken;
+			userInfo.issued = new Date().getTime();
+			req.token = accessToken;
+
+			console.log("New Token :", userInfo.accessToken);
+
+			next();
+		});
+	} else {
+		req.token = userInfo.accessToken;
+
+		console.log("Old Token :", userInfo.accessToken);
+		next();
+	}
+};
+
+router.get('/', requestPreflight, function(req, res, next){
+	if (simpleCache.updatedTime && (new Date().getTime() - simpleCache.updatedTime) / 1000 <= cacheExpireTime) {
+		res.json(simpleCache.recentList);
+		return;
+	}
+
+	var offset = req.query.offset || 10;
+
+	req.options = generateOptions(req.token, 'getRecentDataOrderByDesc', [offset]);
 	next();
 }, commonRequest);
 
-function ensureAuthenticated(req, res, next) {
-  if (req.isAuthenticated()) { return next(); }
-  next({
-  	status: 401,
-  	message: "Unauthorized"
-  });
-}
+router.post('/', requestPreflight, function(req, res, next) {
+	var body = req.body;
+		
+	req.options = generateOptions(req.token, 'addUsage', [body.note, body.amount, body.dayBackwards, body.paymentType]);
+	next();
+}, commonRequest);
+
+router.get('/total', requestPreflight, function(req, res, next) {
+	if (simpleCache.updatedTime && (new Date().getTime() - simpleCache.updatedTime) / 1000 <= cacheExpireTime) {
+		res.json(simpleCache.total);
+		return;
+	}
+
+	req.options = generateOptions(req.token, 'getTotalSpending');
+	next();
+}, commonRequest);
 
 function commonRequest(req, res, next) {
 	var parsed = {};
@@ -113,8 +119,24 @@ function commonRequest(req, res, next) {
 
 		res.json(parsed.response.result);
 	});
-}
+};
+
+function generateOptions(token, apiName, parameters) {
+	var options = extend({}, requestTemplate)
+		, body = {
+		    devMode: true,
+		    function: apiName,
+		    parameters: parameters
+		};
+
+	if (!parameters) {
+		delete body.parameters;
+	}
+
+	options.auth.bearer = token;
+	options.body = JSON.stringify(body);
+
+	return options;
+};
 
 module.exports = router;
-
-
