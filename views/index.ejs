@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Mr.Spent</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta name="author" content="Junhee Woo">
+	<meta name="description" content="The tool managing monthly spending for Jun and Shine">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<link rel="stylesheet" href="/stylesheets/normalize.css">
+	<link rel="stylesheet" href="/stylesheets/skeleton.css">
+	<link rel="stylesheet" href="/stylesheets/webfonts.css">
+</head>
+<body>
+	<div class="container">
+		<div class="row">
+			<h3>Did you spend!?</h3>
+		</div>
+		<label style="clear:left" for="subject">NOTE</label>
+		<input id="subject" class="u-full-width" type="text" placeholder="AK mall, Mart etc..">
+		<label for="subject">AMOUNT</label>
+		<input id="amount" class="u-full-width" type="tel" placeholder="109000 (calculation is ok too)">
+		<label for="paymentType">PAYMENT TYPE</label>
+		<select id="paymentType" class="u-full-width">
+			<option value="카드">카드</option>
+			<option value="현금">현금</option>
+		</select>
+		<label for="dayBackwards">DATE</label>
+		<select id="dayBackwards" class="u-full-width">
+			<option value="">TODAY</option>
+			<option value="1">YESTERDAY</option>
+			<option value="2">DAY BEFORE YESTERDAY</option>
+		</select>
+		<input class="button-primary u-full-width" id="btnSpent" type="submit" value="I spent!">
+		<div class="row" style="margin-top:20px;">
+			<h5>10 RECENTS</h5>
+			<label style="float:left">TOTAL SPENDING :&nbsp;</label><span id="spending" style="color:red; font-weight:bold">Loading...</span>
+			<table class="u-full-width">
+				<thead>
+					 <tr>
+						 <th>Note</th>
+						 <th>Amount</th>
+						 <th>Date</th>
+					 </tr>
+				</thead>
+				<tbody id="recentBody">
+				</tbody>
+			</table>
+		</div>
+		<div class="row">
+			<input class="button u-full-width" id="btnOpenSheet" type="submit" value="Open Original Spreadsheet">
+			<h3> </h3>
+		</div>
+	</div>
+
+	<!-- End Document
+	–––––––––––––––––––––––––––––––––––––––––––––––––– -->
+	<script src="/javascripts/jquery-2.1.4.min.js"></script>
+	<script type="text/javascript">
+		$(function() {
+			$('#btnSpent').click(function() {
+				var subject = $('#subject').val(),
+						amount = $('#amount').val(),
+						dayBackwards = $('#dayBackwards').val(),
+						paymentType = $('#paymentType').val(),
+						button = $('#btnSpent');
+						
+				if (!subject || !amount) {
+					return;
+				}
+				
+				button.prop('disabled', true);
+				button.val('Processing...');
+				button.addClass('button-disabled');
+				button.removeClass('button-primary');
+
+				$.ajax({
+					url: '/api/v1/spending',
+					method: 'POST',
+					data: {
+						note: subject,
+						amount: amount,
+						dayBackwards: dayBackwards,
+						paymentType: paymentType
+					}
+				}).done(onSuccessSpending).fail(onFailure);
+			});
+			
+			$('#btnOpenSheet').click(function() {
+				window.open('https://docs.google.com/spreadsheets/d/<%= documentId %>/edit#gid=<%= sheetId %>');
+			});
+			
+			$.ajax({
+				url: '/api/v1/spending/total'
+			}).done(onFetchSpending).fail(onFailure);
+			$.ajax({
+				url: '/api/v1/spending'
+			}).done(onFetchRecentList).fail(onFailure);
+		});
+		
+		function onFetchSpending(amount) {
+			$('#spending').html(commify(amount) + ' WON');
+		};
+		
+		function onFetchRecentList(list) {
+			var table = $('#recentBody');
+			table.empty();
+			
+			for (var i = 0; i < list.length; i++) {
+				table.append('<tr><td>' + list[i].note + '</td><td>' + commify(list[i].amount) + '</td><td>' + 
+					getLingualDayString(list[i].date) + '</td>');
+			}
+		};
+		
+		function onFailure(error) {
+			console.log(error);
+		};
+		
+		function onSuccessSpending() {
+			$.ajax({
+				url: '/api/v1/spending/total'
+			}).done(onFetchSpending).fail(onFailure);
+			$.ajax({
+				url: '/api/v1/spending'
+			}).done(onFetchRecentList).fail(onFailure);
+
+			var button = $('#btnSpent');
+
+			button.val('Done. You Spent!!');
+			
+			setTimeout(function() {
+				$('#subject').val('');
+				$('#amount').val('');
+				button.prop('disabled', false);			
+				button.val('I spent!');
+				button.removeClass('button-disabled');
+				button.addClass('button-primary');
+			}, 1000);
+		};
+		
+		function getLingualDayString(dateString) {
+			var date = new Date(dateString),
+					now = new Date();
+			
+			for (var i = 0; i <= 4; i++) {				
+				if (now.getDate() === date.getDate()) {
+					switch (i) {
+						case 0:
+							return '오늘';
+							break;
+						case 1:
+							return '어제';
+							break;
+						case 2:
+							return getWeekDayString(date) + '요일';
+							break;
+						case 3:
+							return getWeekDayString(date) + '요일';
+							break;
+						default:
+							return getWeekDayString(date) + '요일';
+							break;
+					}
+				}
+				
+				now.setDate(now.getDate() - 1);
+			}
+			
+			return date.getFullYear() + '.' + (date.getMonth() + 1) + '.' + date.getDate() + ' (' + getWeekDayString(date) + ')';
+		}
+		
+		function getWeekDayString(date) {
+			switch (date.getDay()) {
+				case 0:
+					return '일';
+					break;
+				case 1:
+					return '월';
+					break;
+				case 2:
+					return '화';
+					break;
+				case 3:
+					return '수';
+					break;
+				case 4:
+					return '목';
+					break;
+				case 5:
+					return '금';
+					break;
+				default:
+					return '토';
+					break;
+			};
+		};
+		
+		function commify(n) {
+			var reg = /(^[+-]?\d+)(\d{3})/;	 // 정규식
+			n += '';													// 숫자를 문자열로 변환
+
+			while (reg.test(n))
+				n = n.replace(reg, '$1' + ',' + '$2');
+
+			return n;
+		}
+	</script>
+</body>
+</html>

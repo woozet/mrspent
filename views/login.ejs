@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Mr.Spent</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta name="author" content="Junhee Woo">
+	<meta name="description" content="The tool managing monthly spending for Jun and Shine">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<link rel="stylesheet" href="/stylesheets/normalize.css">
+	<link rel="stylesheet" href="/stylesheets/skeleton.css">
+	<link rel="stylesheet" href="/stylesheets/webfonts.css">
+</head>
+<body>
+	<div class="container">
+		<h4>For spending..</h4>
+		<label>You must login with your Google account first.</label>
+		<input class="button-primary u-full-width" id="btnLogin" type="submit" value="GO TO GOOGLE">
+	</div>
+
+	<!-- End Document
+	–––––––––––––––––––––––––––––––––––––––––––––––––– -->
+	<script src="/javascripts/jquery-2.1.4.min.js"></script>
+	<script type="text/javascript">
+		$(function() {
+			$('#btnLogin').click(function() {
+				$('#btnLogin').prop('disabled', true);
+				location.href = "/auth/google";
+			});
+		});
+	</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+// Rename this json file to default.json for use
+{
+	"googleOauthJson": {
+	  "web": "** Paste json object string downloaded from user authentication info in Google Developer Console **"
+	},
+	"spreadsheetInfo": {
+		"documentId": "** Id of document ** ",
+		"sheetId" "** Id of sheet(tab) in document **"
+		// ref. https://docs.google.com/spreadsheets/d/{{documentId}}/edit#gid={{sheetId}}
+	},
+	"appScriptInfo": {
+		"projectId": "** Your Google App Script project key **"
+	}
+}
