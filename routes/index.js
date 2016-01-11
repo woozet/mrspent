@@ -16,7 +16,9 @@ router.get('/logout', function(req, res){
 });
 
 function ensureAuthenticated(req, res, next) {
-  if (req.cookies.SID && req.app.get('users')[req.cookies.SID]) { return next(); }
+  if (req.cookies.SID 
+  	&& req.app.get('users')[req.cookies.SID]
+  	&& req.app.get('users')[req.cookies.SID].accessToken) { return next(); }
   res.redirect('/auth/google');
 }
 
