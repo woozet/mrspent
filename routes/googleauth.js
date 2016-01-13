@@ -1,7 +1,6 @@
 var express = require('express');
 var google = require('googleapis');
 var router = express.Router();
-var passport = require('passport');
 var plus = google.plus('v1');
 
 var SCOPES = ['profile', 'https://www.googleapis.com/auth/spreadsheets'];

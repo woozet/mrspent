@@ -3,7 +3,6 @@ var google = require('googleapis');
 var config = require('../config');
 var extend = require('util')._extend;
 var router = express.Router();
-var refresh = require('passport-oauth2-refresh');
 var script = google.script('v1');
 
 var simpleCache = {
