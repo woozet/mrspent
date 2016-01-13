@@ -10,7 +10,7 @@ router.get('/', function(req, res, next) {
       , url;
 
   if (!oauth2Client) {
-    next('error');
+    return next('OAuth2 module is not initialized.');
   }
 
   url = oauth2Client.generateAuthUrl({
@@ -28,15 +28,14 @@ router.get('/callback', function(req, res, next) {
       , code = req.query.code;
 
   if (!code || !oauth2Client) {
-    console.log('ddd');
-    next('error');
+    return next('Authorization error via Google.');
   }
   
   oauth2Client.getToken(code, function(err, tokens) {
     if (err) {
-      next('error');
+      return next('error');
     }
-    console.log(tokens);
+    console.log('[TOKEN ISSUED]', tokens);
     oauth2Client.setCredentials(tokens);
 
     plus.people.get({ userId: 'me', auth: oauth2Client }, function(err, response) {

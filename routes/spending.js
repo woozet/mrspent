@@ -25,20 +25,36 @@ var prepareRequest = function(req, res, next) {
 		, options;
 
 	if (!userInfo) {
-		next({
+		return next({
 	  		status: 401,
-	  		message: "Unauthorized"
+	  		message: 'Unauthorized'
 	  	});
 	}
 
-	console.log('[PROFILE]', userInfo.profile);
+	console.log('[REQUEST TOKEN PROFILE]', userInfo.tokens);
+	
 	oauth2Client.setCredentials(userInfo.tokens);
+	oauth2Client.getAccessToken(function(err, token, response) {
+		if (err) {
+			console.log('[TOKEN REFRESH ERROR]', err);
+			return next({
+				status: err.code,
+				message: err.errors && err.errors.length > 0 ? err.errors[0].message : ''
+			});
+		}
 
-	options = extend({}, requestTemplate);
-	options.auth = oauth2Client;
-	req.options = options;
+		// update auth cache
+		if (response) {
+			console.log('[TOKEN REFRESH RESPONSE]', response.body);
+			userInfo.tokens = response.body;	
+		}
 
-	next();
+		options = extend({}, requestTemplate);
+		options.auth = oauth2Client;
+		req.options = options;
+
+		next();
+	});
 };
 
 function doRequest(req, res, next) {
@@ -46,22 +62,20 @@ function doRequest(req, res, next) {
 
 	script.scripts.run(req.options, function(err, response) {
 		if (err) {
-			console.log("[ERROR]", err);
-			next({
+			console.log('[ERROR]', err);
+			return next({
 				status: err.code,
-				message: err.errors[0].message
+				message: err.errors && err.errors.length > 0 ? err.errors[0].message : ''
 			});
-			return;
 		}
 
-		console.log("[RESPONSE]", response);
+		console.log('[RESPONSE]', response);
 		doCache(response.name, response.response);
 		res.json(response.response.result);
 	});
 }
 
 function doCache(functionName, response) {
-console.log(functionName, response);
 	// Simple caching
 	switch (functionName) {
 		case 'getTotalSpending':
@@ -86,8 +100,7 @@ router.get('/', prepareRequest, function(req, res, next){
 	var offset = req.query.offset || 10;
 
 	if (simpleCache.updatedTime && (new Date().getTime() - simpleCache.updatedTime) / 1000 <= cacheExpireTime) {
-		res.json(simpleCache.recentList);
-		return;
+		return res.json(simpleCache.recentList);
 	}
 
 	req.options.resource.function = 'getRecentDataOrderByDesc';
@@ -107,8 +120,7 @@ router.post('/', prepareRequest, function(req, res, next) {
 
 router.get('/total', prepareRequest, function(req, res, next) {
 	if (simpleCache.updatedTime && (new Date().getTime() - simpleCache.updatedTime) / 1000 <= cacheExpireTime) {
-		res.json(simpleCache.total);
-		return;
+		return res.json(simpleCache.total);
 	}
 
 	req.options.resource.function = 'getTotalSpending';
