@@ -1,9 +1,10 @@
 var express = require('express');
-var request = require('request');
+var google = require('googleapis');
 var config = require('../config');
 var extend = require('util')._extend;
 var router = express.Router();
 var refresh = require('passport-oauth2-refresh');
+var script = google.script('v1');
 
 var simpleCache = {
 	total: 0,
@@ -13,18 +14,16 @@ var simpleCache = {
 var cacheExpireTime = 3600;
 
 var requestTemplate = {
-	uri: ['https://script.googleapis.com/v1/scripts/', config.appScriptInfo.projectId, ':run'].join(''),
-	method: 'POST',
-	headers: {
-		'Content-Type': 'application/json'
-	},
-	auth: {
-		bearer: ''
+	scriptId: config.appScriptInfo.projectId,
+	resource: {
+		devMode: true
 	}
 };
 
-var requestPreflight = function(req, res, next) {
-	var userInfo = req.app.get('users')[req.cookies.SID];
+var prepareRequest = function(req, res, next) {
+	var oauth2Client = req.app.get('oauth2Client')
+		, userInfo = req.app.get('users')[req.cookies.SID]
+		, options;
 
 	if (!userInfo) {
 		next({
@@ -33,110 +32,89 @@ var requestPreflight = function(req, res, next) {
 	  	});
 	}
 
-	var options = extend({}, requestTemplate);
+	console.log('[PROFILE]', userInfo.profile);
+	oauth2Client.setCredentials(userInfo.tokens);
 
-	options.auth.bearer = userInfo.accessToken;
-	options.body = JSON.stringify({
-	    devMode: true,
-	    function: 'getTotalSpending'
-	});
+	options = extend({}, requestTemplate);
+	options.auth = oauth2Client;
+	req.options = options;
 
-	if ((new Date().getTime() - userInfo.issued) / 1000 >= cacheExpireTime) {
-		refresh.requestNewAccessToken('google', userInfo.refreshToken, function(err, accessToken, refreshToken) {
-			userInfo.accessToken = accessToken;
-			userInfo.issued = new Date().getTime();
-			req.token = accessToken;
-
-			console.log("New Token :", userInfo.accessToken);
-
-			next();
-		});
-	} else {
-		req.token = userInfo.accessToken;
-
-		console.log("Old Token :", userInfo.accessToken);
-		next();
-	}
+	next();
 };
 
-router.get('/', requestPreflight, function(req, res, next){
+function doRequest(req, res, next) {
+	var parsed = {};
+
+	script.scripts.run(req.options, function(err, response) {
+		if (err) {
+			console.log("[ERROR]", err);
+			next({
+				status: err.code,
+				message: err.errors[0].message
+			});
+			return;
+		}
+
+		console.log("[RESPONSE]", response);
+		doCache(response.name, response.response);
+		res.json(response.response.result);
+	});
+}
+
+function doCache(functionName, response) {
+console.log(functionName, response);
+	// Simple caching
+	switch (functionName) {
+		case 'getTotalSpending':
+		console.log(response);
+			simpleCache.total = response.result;
+			simpleCache.updatedTime = new Date().getTime();
+			break;
+		case 'getRecentDataOrderByDesc':
+			simpleCache.recentList = response.result;
+			simpleCache.updatedTime = new Date().getTime();
+			break;
+		case 'addUsage':
+			simpleCache.updatedTime = null;
+			break;
+		default:
+			break;
+	}
+}
+
+// Let's routing...
+router.get('/', prepareRequest, function(req, res, next){
+	var offset = req.query.offset || 10;
+
 	if (simpleCache.updatedTime && (new Date().getTime() - simpleCache.updatedTime) / 1000 <= cacheExpireTime) {
 		res.json(simpleCache.recentList);
 		return;
 	}
 
-	var offset = req.query.offset || 10;
+	req.options.resource.function = 'getRecentDataOrderByDesc';
+	req.options.resource.parameters = [offset];	
 
-	req.options = generateOptions(req.token, 'getRecentDataOrderByDesc', [offset]);
 	next();
-}, commonRequest);
+}, doRequest);
 
-router.post('/', requestPreflight, function(req, res, next) {
+router.post('/', prepareRequest, function(req, res, next) {
 	var body = req.body;
-		
-	req.options = generateOptions(req.token, 'addUsage', [body.note, body.amount, body.dayBackwards, body.paymentType]);
-	next();
-}, commonRequest);
 
-router.get('/total', requestPreflight, function(req, res, next) {
+	req.options.resource.function = 'addUsage';
+	req.options.resource.parameters = [body.note, body.amount, body.dayBackwards, body.paymentType];	
+	
+	next();
+}, doRequest);
+
+router.get('/total', prepareRequest, function(req, res, next) {
 	if (simpleCache.updatedTime && (new Date().getTime() - simpleCache.updatedTime) / 1000 <= cacheExpireTime) {
 		res.json(simpleCache.total);
 		return;
 	}
 
-	req.options = generateOptions(req.token, 'getTotalSpending');
+	req.options.resource.function = 'getTotalSpending';
+	
 	next();
-}, commonRequest);
-
-function commonRequest(req, res, next) {
-	var parsed = {};
-
-	request(req.options, function(err, response, body) {
-		if (err) {
-			next({
-				message: err
-			});
-		}
-
-		parsed = JSON.parse(body);
-
-		// Simple caching
-		switch (JSON.parse(req.options.body).function) {
-			case 'getTotalSpending':
-				simpleCache.total = parsed.response.result;
-				simpleCache.updatedTime = new Date().getTime();
-				break;
-			case 'getRecentDataOrderByDesc':
-				simpleCache.recentList = parsed.response.result;
-				simpleCache.updatedTime = new Date().getTime();
-				break;
-			case 'addUsage':
-				simpleCache.updatedTime = null;
-				break;
-			default:
-				break;
-		}
-
-		res.json(parsed.response.result);
-	});
-};
-
-function generateOptions(token, apiName, parameters) {
-	var options = extend({}, requestTemplate)
-		, body = {
-		    devMode: true,
-		    function: apiName,
-		    parameters: parameters
-		};
-
-	if (!parameters) {
-		delete body.parameters;
-	}
-
-	options.auth.bearer = token;
-	options.body = JSON.stringify(body);
-
-	return options;
-};
+}, doRequest);
 
 module.exports = router;
