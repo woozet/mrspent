@@ -24,7 +24,7 @@ var prepareRequest = function(req, res, next) {
 		, userInfo = req.app.get('users')[req.cookies.SID]
 		, options;
 
-	if (!userInfo) {
+	if (!userInfo || (!userInfo.tokens.refresh_token && new Date().getTime() > userInfo.tokens.expiry_date)) {
 		return next({
 	  		status: 401,
 	  		message: 'Unauthorized'

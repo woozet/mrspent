@@ -19,11 +19,17 @@ function ensureAuthenticated(req, res, next) {
 	var oauth2Client = req.app.get('oauth2Client')
 		, userInfo = req.app.get('users')[req.cookies.SID];
 
-	if (userInfo &&	userInfo.tokens.refresh_token) {
+	// Offline mode
+	if (userInfo && config.appScriptInfo.offline && userInfo.tokens.refresh_token) {
+		return next();
+	}
+
+	// Webapp mode
+	if (userInfo &&	new Date().getTime() <= userInfo.tokens.expiry_date) {
 		return next(); 
 	}
 
-	res.redirect('/login');
+	res.redirect('/auth/google');
 }
 
 module.exports = router;

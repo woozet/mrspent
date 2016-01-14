@@ -126,6 +126,11 @@
 		};
 		
 		function onFailure(error) {
+			if (error.status === 401) {
+				alert('접속시간이 오래되어 로그아웃되었습니다. 로그인을 재시도합니다.');
+				window.location.replace("/auth/google");
+			}
+
 			console.log(error);
 		};
 		

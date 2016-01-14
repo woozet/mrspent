@@ -1,5 +1,6 @@
 var express = require('express');
 var google = require('googleapis');
+var config = require('../config');
 var router = express.Router();
 var plus = google.plus('v1');
 
@@ -14,7 +15,7 @@ router.get('/', function(req, res, next) {
   }
 
   url = oauth2Client.generateAuthUrl({
-    access_type: 'offline'
+    access_type: config.appScriptInfo.offline ? 'offline' : 'online'
     , scope: SCOPES
   });
 
@@ -33,7 +34,7 @@ router.get('/callback', function(req, res, next) {
   
   oauth2Client.getToken(code, function(err, tokens) {
     if (err) {
-      return next('error');
+      return next('Failed to issue token.');
     }
     console.log('[TOKEN ISSUED]', tokens);
     oauth2Client.setCredentials(tokens);

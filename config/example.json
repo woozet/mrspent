@@ -9,6 +9,7 @@
 		// ref. https://docs.google.com/spreadsheets/d/{{documentId}}/edit#gid={{sheetId}}
 	},
 	"appScriptInfo": {
-		"projectId": "** Your Google App Script project key **"
+		"projectId": "** Your Google App Script project key **",
+		"offline": false
 	}
 }
