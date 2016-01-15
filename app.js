@@ -23,9 +23,12 @@ var GOOGLE_CLIENT_ID = config.googleOauthJson.web.client_id
     , authCache = {};
 
 // logger setup
-winston.add(winston.transports.File, { name:'filelog', filename: config.general.logPath + '/mrspent.log', json: false });
-winston.add(winston.transports.File, { name:'jsonlog', filename: config.general.logPath + '/mrspent_log.json', json: true });
-winston.handleExceptions(new winston.transports.File({ filename: config.general.logPath + '/uncaughtExceptions.log' }));
+winston.add(winston.transports.File, { name:'filelog', filename: config.general.logPath + 'mrspent.log', json: false, 
+                                        timestamp: function() {
+                                          return new Date();
+                                        } });
+winston.add(winston.transports.File, { name:'jsonlog', filename: config.general.logPath + 'mrspent_log.json', json: true });
+winston.handleExceptions(new winston.transports.File({ filename: config.general.logPath + 'uncaughtExceptions.log' }));
 winston.exitOnError = false;
 winston.level = config.general.logLevel;
 
