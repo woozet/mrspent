@@ -1,6 +1,7 @@
 var express = require('express');
 var google = require('googleapis');
 var config = require('../config');
+var logger = require('winston');
 var router = express.Router();
 var plus = google.plus('v1');
 
@@ -36,7 +37,7 @@ router.get('/callback', function(req, res, next) {
     if (err) {
       return next('Failed to issue token.');
     }
-    console.log('[TOKEN ISSUED]', tokens);
+    logger.debug('[TOKEN ISSUED]', tokens);
     oauth2Client.setCredentials(tokens);
 
     plus.people.get({ userId: 'me', auth: oauth2Client }, function(err, response) {

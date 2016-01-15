@@ -1,5 +1,6 @@
 var express = require('express');
 var google = require('googleapis');
+var logger = require('winston');
 var config = require('../config');
 var extend = require('util')._extend;
 var router = express.Router();
@@ -31,12 +32,12 @@ var prepareRequest = function(req, res, next) {
 	  	});
 	}
 
-	console.log('[REQUEST TOKEN PROFILE]', userInfo.tokens);
+	logger.debug('[TOKEN FOR REQUEST]', userInfo.tokens);
 	
 	oauth2Client.setCredentials(userInfo.tokens);
 	oauth2Client.getAccessToken(function(err, token, response) {
 		if (err) {
-			console.log('[TOKEN REFRESH ERROR]', err);
+			logger.error('[TOKEN REFRESH ERROR]', err);
 			return next({
 				status: err.code,
 				message: err.errors && err.errors.length > 0 ? err.errors[0].message : ''
@@ -45,7 +46,7 @@ var prepareRequest = function(req, res, next) {
 
 		// update auth cache
 		if (response) {
-			console.log('[TOKEN REFRESH RESPONSE]', response.body);
+			logger.info('[TOKEN REFRESH RESPONSE]', response.body);
 			userInfo.tokens = response.body;	
 		}
 
@@ -60,16 +61,18 @@ var prepareRequest = function(req, res, next) {
 function doRequest(req, res, next) {
 	var parsed = {};
 
+	logger.info('[REQUEST TO GOOGLE]', req.options);
+
 	script.scripts.run(req.options, function(err, response) {
 		if (err) {
-			console.log('[ERROR]', err);
+			logger.error('[REQUEST ERROR]', err);
 			return next({
 				status: err.code,
 				message: err.errors && err.errors.length > 0 ? err.errors[0].message : ''
 			});
 		}
 
-		console.log('[RESPONSE]', response);
+		logger.info('[RESPONSE OF', response.name + ']', response);
 		doCache(response.name, response.response);
 		res.json(response.response.result);
 	});
@@ -79,7 +82,6 @@ function doCache(functionName, response) {
 	// Simple caching
 	switch (functionName) {
 		case 'getTotalSpending':
-		console.log(response);
 			simpleCache.total = response.result;
 			simpleCache.updatedTime = new Date().getTime();
 			break;

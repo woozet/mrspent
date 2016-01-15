@@ -1,15 +1,19 @@
 // Rename this json file to default.json for use
+// You can refer document and sheet id as follows - https://docs.google.com/spreadsheets/d/{{documentId}}/edit#gid={{sheetId}}
 {
 	"googleOauthJson": {
-	  "web": "** Paste json object string downloaded from user authentication info in Google Developer Console **"
+	  "web": "** Paste json object string downloaded from authentication info in Google Developer Console **"
 	},
 	"spreadsheetInfo": {
 		"documentId": "** Id of document ** ",
 		"sheetId" "** Id of sheet(tab) in document **"
-		// ref. https://docs.google.com/spreadsheets/d/{{documentId}}/edit#gid={{sheetId}}
 	},
 	"appScriptInfo": {
 		"projectId": "** Your Google App Script project key **",
 		"offline": false
+	},
+	"general": {
+		"logLevel": "info",
+		"logPath": "."
 	}
 }
