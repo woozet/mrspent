@@ -1,3 +1,4 @@
+var fs = require('fs');
 var express = require('express');
 var path = require('path');
 var favicon = require('serve-favicon');
@@ -23,6 +24,11 @@ var GOOGLE_CLIENT_ID = config.googleOauthJson.web.client_id
     , authCache = {};
 
 // logger setup
+try {
+  fs.accessSync(config.general.logPath);
+} catch (e) {
+  fs.mkdirSync(config.general.logPath);
+}
 winston.add(winston.transports.File, { name:'filelog', filename: config.general.logPath + 'mrspent.log', json: false, 
                                         timestamp: function() {
                                           return new Date();
